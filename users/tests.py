@@ -10,71 +10,60 @@ from django.contrib.auth import get_user_model
 
 class CustomUserTest(TestCase):
     def setUp(self):
-        self.username = 'dana123'
         self.email = 'dana123@gmail.com'
         self.password = 'D123456$'
 
     def test_signup_page_url_and_template(self):
-        response = self.client.get("/users/signup/")
+        response = self.client.get("/accounts/signup/")
         self.assertEqual(response.status_code, 200)
-        self.assertTemplateUsed(response, template_name='registration/signup.html')
+        self.assertTemplateUsed(response, template_name='account/signup.html')
 
     def test_signup(self):
-        response = self.client.post(reverse('signup'), data={
-            'username': self.username,
+        response = self.client.post(reverse('account_signup'), data={
             'email': self.email,
             'password1': self.password,
-            'password2': self.password
         })
         self.assertEqual(response.status_code, 302)
         users = get_user_model().objects.all()
         self.assertEqual(users.count(), 1)
-
-        response1 = self.client.post(reverse('login'), data={
-            'username': self.username,
-            'password1': self.password,
-        })
-        self.assertEqual(response1.status_code, 200)
-        self.assertContains(response1, 'dana123')
 
     def test_duplicate_users(self):
         """
         Test if duplicate users are allowed by:
-            1. Creat an initial user, then sign in. 
-            2. Signup again with the same user contact information.
-            3. Test if the page is redirected to login page. 
-            3. Test how many users are in the database.
+            1. Signup, after that you'll be redirected to home  
+            2. Logout, you'll be redirected to home again.
+            3. Signup again with the same user contact information. 
+            4. No redirection, and response will contain 'A user is already registered with this e-mail address.'
+            5. Test how many users are in the database, will be 1.
         """
-        response = self.client.post(reverse('signup'), data={
-            'username': self.username,
+        # Create first user
+        response = self.client.post(reverse('account_signup'), data={
             'email': self.email,
             'password1': self.password,
-            'password2': self.password
         })
+
+        # Check redirection to home, and number of users
         self.assertEqual(response.status_code, 302)
+        self.assertRedirects(response,'/')
+
         users = get_user_model().objects.all()
         self.assertEqual(users.count(), 1)
 
-        response1 = self.client.post(reverse('login'), data={
-            'username': self.username,
-            'password1': self.password,
-        })
-        self.assertEqual(response1.status_code, 200)
-        self.assertContains(response1, 'dana123')
+        # Logout
+        logout_response = self.client.post(reverse('account_logout'))
+        self.assertEqual(logout_response.status_code, 302)
+        self.assertRedirects(logout_response, reverse('home'), status_code=302)
 
-        response2 = self.client.post(reverse('signup'), data={
-            'username': self.username,
+        # Signup with duplicate email
+        response2 = self.client.post(reverse('account_signup'), data={
             'email': self.email,
             'password1': self.password,
-            'password2': self.password
         })
-        # status code is 200 not 302, since signup failed so there is no direction to signin page
-        self.assertEqual(response2.status_code, 200)
+
+        # no redirection, still in signup page
+        self.assertTemplateUsed(response2, template_name='account/signup.html')
+        self.assertContains(response2,'A user is already registered with this e-mail address.')
+
         # users.count equals 1 not 2, since signup failed
         users = get_user_model().objects.all()
         self.assertEqual(users.count(), 1)
-
-
-
-
-
